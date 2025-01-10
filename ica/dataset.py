@@ -42,10 +42,12 @@ def preprocess_regression_dataset(df: pd.DataFrame, inplace: bool = False) -> pd
     }
 
     df = (
-        data.query("`Ano de Referência` != '---'")
+        df.query("`Ano de Referência` != '---'")
         .rename(columns=columns_new_names)
-        .rename(columns={c: remove_after_dash(c) for c in data.columns})
+        .rename(columns={c: remove_after_dash(c) for c in df.columns})
     )
+
+    df["ano"] = df["ano"].astype(int)
 
     for c in df.columns[10:]:
         if df[c].dtype == "O":
@@ -55,8 +57,6 @@ def preprocess_regression_dataset(df: pd.DataFrame, inplace: bool = False) -> pd
                 .str.replace(",", ".", regex=False)
                 .astype(float)
             )
-        elif c == "ano":
-            df[c] = df[c].astype(int)
 
     return df
 

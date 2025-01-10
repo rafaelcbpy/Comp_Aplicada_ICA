@@ -1,12 +1,18 @@
+import re
 from pathlib import Path
 
+import pandas as pd
 import typer
 from loguru import logger
 from tqdm import tqdm
-import pandas as pd
+
 from ica.config import PROCESSED_DATA_DIR, RAW_DATA_DIR
 
 app = typer.Typer()
+
+
+def remove_after_dash(input_string):
+    return re.split(r"-", input_string, 1)[0].rstrip()
 
 
 def preprocess_regression_dataset(df: pd.DataFrame, inplace: bool = False) -> pd.DataFrame:
@@ -23,42 +29,34 @@ def preprocess_regression_dataset(df: pd.DataFrame, inplace: bool = False) -> pd
         df = df.copy()
 
     columns_new_names = {
+        "Código do Município": "cd_municipio",
         "Município": "nm_municipio",
+        "Estado": "estado",
         "Ano de Referência": "ano",
-        # 'Sigla do Prestador': 'sg_prestador',
+        "Código do Prestador": "cd_prestador",
+        "Prestador": "nm_prestador",
+        "Sigla do Prestador": "sg_prestador",
         "Abrangência": "abrangencia",
         "Tipo de Serviço": "tipo_servico",
         "Natureza Jurídica": "nat_juridica",
-        "IN001 - Densidade de economias de água por ligação": "IN001",
-        "IN009 - Índice de hidrometração": "IN009",
-        "IN020 - Extensão da rede de água por ligação": "IN020",
-        "IN022 - Consumo médio percapita de água": "IN022",
-        "IN023 - Índice de atendimento urbano de água": "IN023",
-        "IN037 - Participação da despesa com energia elétrica nas despesas de exploração": "IN037",
-        "IN038 - Participação da despesa com produtos químicos nas despesas de exploração (DEX)": "IN038",
-        "IN055 - Índice de atendimento total de água": "IN055",
-        "IN057 - Índice de fluoretação de água": "IN057",
     }
 
-    selected_cols = columns_new_names.keys()
-    numerical_columns = ["IN001", "IN009", "IN020", "IN023", "IN037", "IN038", "IN055", "IN057"]
-    categorical_columns = ["tipo_servico"]
-    target_col = "IN022"
-
-    columns_transformations = {"ano": int}
-    columns_transformations.update(
-        {
-            c: lambda x: x.str.replace(",", ".").astype(float)
-            for c in numerical_columns + [target_col]
-        }
+    df = (
+        data.query("`Ano de Referência` != '---'")
+        .rename(columns=columns_new_names)
+        .rename(columns={c: remove_after_dash(c) for c in data.columns})
     )
 
-    df = df[selected_cols].query("`Ano de Referência` != '---'").rename(columns=columns_new_names)
-
-    df["tipo_servico"] = df["tipo_servico"].str.rstrip()
-    df[list(columns_transformations.keys())] = df.agg(columns_transformations)
-
-    df = df[df["IN022"].notna()]
+    for c in df.columns[10:]:
+        if df[c].dtype == "O":
+            df[c] = (
+                df[c]
+                .str.replace(".", "", regex=False)
+                .str.replace(",", ".", regex=False)
+                .astype(float)
+            )
+        elif c == "ano":
+            df[c] = df[c].astype(int)
 
     return df
 
